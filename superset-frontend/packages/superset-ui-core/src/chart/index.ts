@@ -27,7 +27,7 @@ export type { ChartPropsConfig };
 
 export { default as createLoadableRenderer } from './components/createLoadableRenderer';
 export { default as reactify } from './components/reactify';
-export { default as SuperChart } from './components/SuperChart';
+export { default as SuperChart } from './components/SuperChartFn';
 
 export { default as getChartBuildQueryRegistry } from './registries/ChartBuildQueryRegistrySingleton';
 export { default as getChartComponentRegistry } from './registries/ChartComponentRegistrySingleton';
