@@ -145,6 +145,10 @@ export const contextMenuEventHandler =
         crossFilter:
           groupby.length > 0 ? getCrossFilterDataMask(e.name) : undefined,
         drillBy: { filters: drillFilters, groupbyFieldName: 'groupby' },
+        hierarchicalDrillBy: {
+          filters: drillFilters,
+          groupbyFieldName: 'groupby',
+        },
       });
     }
   };

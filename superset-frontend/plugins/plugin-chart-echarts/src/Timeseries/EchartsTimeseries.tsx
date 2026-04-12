@@ -322,6 +322,10 @@ export default function EchartsTimeseries({
         onContextMenu(pointerEvent.clientX, pointerEvent.clientY, {
           drillToDetail: drillToDetailFilters,
           drillBy: { filters: drillByFilters, groupbyFieldName: 'groupby' },
+          hierarchicalDrillBy: {
+            filters: drillByFilters,
+            groupbyFieldName: 'groupby',
+          },
           crossFilter,
         });
       }

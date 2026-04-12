@@ -64,6 +64,7 @@ export interface DrillBySubmenuProps {
   onDrillBy?: (column: Column, dataset: Dataset) => void;
   dataset?: Dataset;
   isLoadingDataset?: boolean;
+  menuTitle?: string;
 }
 
 export const DrillBySubmenu = ({
@@ -77,6 +78,7 @@ export const DrillBySubmenu = ({
   onDrillBy,
   dataset,
   isLoadingDataset = false,
+  menuTitle,
   ...rest
 }: DrillBySubmenuProps) => {
   const theme = useTheme();
@@ -302,7 +304,7 @@ export const DrillBySubmenu = ({
         }
       }}
     >
-      <span>{t('Drill by')}</span>
+      <span>{menuTitle ?? t('Drill by')}</span>
       {isDisabled ? (
         <MenuItemTooltip title={tooltip} />
       ) : (

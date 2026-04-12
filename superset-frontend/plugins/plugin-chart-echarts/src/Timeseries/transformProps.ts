@@ -116,6 +116,61 @@ import {
 import { safeParseEChartOptions } from '../utils/safeEChartOptionsParser';
 import { mergeCustomEChartOptions } from '../utils/mergeCustomEChartOptions';
 
+const HIERARCHICAL_AXIS_STEP = 35;
+
+/**
+ * Builds the sorted x-axis data and parent-level axis data arrays for
+ * hierarchical drill-by mode.
+ *
+ * When `_hierarchicalDrillBy: true`, the x-axis (leaf column) values are
+ * sorted by their parent groupby values so that each parent group's leaves
+ * appear consecutively.  The returned `parentAxesData` arrays can be used to
+ * overlay secondary category axes that show the parent grouping labels.
+ */
+function buildHierarchicalXAxisData(
+  data: Record<string, unknown>[],
+  xAxisLabel: string,
+  labelMap: Record<string, string[]>,
+  groupBy: string[],
+): {
+  sortedXData: string[];
+  parentAxesData: Array<{ data: string[] }>;
+} {
+  const seriesColumns = Object.keys(labelMap);
+  // Map each leaf x-value → its parent dimension values (from labelMap)
+  const xToParents = new Map<string, string[]>();
+
+  data.forEach(row => {
+    const xVal = String(row[xAxisLabel] ?? '');
+    if (!xToParents.has(xVal)) {
+      for (const col of seriesColumns) {
+        if (row[col] != null) {
+          xToParents.set(xVal, labelMap[col]);
+          break;
+        }
+      }
+    }
+  });
+
+  // Sort leaf values: outermost groupBy column first, then innermost, then leaf
+  const sortedXData = Array.from(xToParents.keys()).sort((a, b) => {
+    const pa = xToParents.get(a) ?? [];
+    const pb = xToParents.get(b) ?? [];
+    for (let i = 0; i < groupBy.length; i += 1) {
+      const cmp = String(pa[i] ?? '').localeCompare(String(pb[i] ?? ''));
+      if (cmp !== 0) return cmp;
+    }
+    return a.localeCompare(b);
+  });
+
+  // Build one data array per parent level (groupBy[0] = outermost, …, groupBy[n-1] = innermost)
+  const parentAxesData = groupBy.map((_, levelIdx) => ({
+    data: sortedXData.map(x => String(xToParents.get(x)?.[levelIdx] ?? '')),
+  }));
+
+  return { sortedXData, parentAxesData };
+}
+
 export default function transformProps(
   chartProps: EchartsTimeseriesChartProps,
 ): TimeseriesChartTransformedProps {
@@ -797,6 +852,66 @@ export default function transformProps(
         TIMESERIES_CONSTANTS.horizontalBarLabelRightPadding,
       );
     }
+  }
+
+  // Hierarchical drill-by: add secondary category axes for each parent groupBy level.
+  // Only applies when the flag is set, groupby is non-empty, axis is categorical, and
+  // the chart is not in horizontal orientation.
+  if (
+    (formData as any)._hierarchicalDrillBy === true &&
+    groupBy.length > 0 &&
+    xAxisType === AxisType.Category &&
+    !isHorizontal
+  ) {
+    const { sortedXData, parentAxesData } = buildHierarchicalXAxisData(
+      rebasedData as Record<string, unknown>[],
+      xAxisLabel,
+      labelMap,
+      groupBy,
+    );
+
+    // Leaf axis: enforce explicit sorted order so parent groups are contiguous
+    xAxis = {
+      ...xAxis,
+      type: 'category' as const,
+      data: sortedXData,
+    };
+
+    // Parent axes: innermost groupBy is closest to the leaf (smallest offset);
+    // outermost is farthest (largest offset).  We reverse the parentAxesData array
+    // so index 0 of additionalAxes = innermost parent (small offset).
+    const additionalAxes = [...parentAxesData].reverse().map(
+      (parentData, idx) => ({
+        type: 'category' as const,
+        position: 'bottom' as const,
+        offset: (idx + 1) * HIERARCHICAL_AXIS_STEP,
+        data: parentData.data,
+        axisLabel: {
+          interval: 0,
+          hideOverlap: false,
+          rotate: 0,
+          fontWeight: 600,
+          formatter: (value: string, index: number) =>
+            index === 0 || parentData.data[index] !== parentData.data[index - 1]
+              ? value
+              : '',
+        },
+        axisLine: { show: false },
+        axisTick: {
+          show: true,
+          length: HIERARCHICAL_AXIS_STEP,
+          alignWithLabel: false,
+          lineStyle: { color: '#ccc' },
+        },
+        splitLine: { show: false },
+      }),
+    );
+
+    // ECharts supports xAxis as an array for multiple x-axes
+    xAxis = [xAxis, ...additionalAxes];
+
+    // Expand bottom padding to make room for the extra axis levels
+    padding.bottom = (padding.bottom || 0) + groupBy.length * HIERARCHICAL_AXIS_STEP;
   }
 
   const echartOptions: EChartsCoreOption = {

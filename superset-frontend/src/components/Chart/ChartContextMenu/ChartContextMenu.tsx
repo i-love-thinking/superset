@@ -48,6 +48,7 @@ import { usePermissions } from 'src/hooks/usePermissions';
 import { Dropdown } from '@superset-ui/core/components';
 import { updateDataMask } from 'src/dataMask/actions';
 import DrillByModal from 'src/components/Chart/DrillBy/DrillByModal';
+import HierarchicalDrillByModal from 'src/components/Chart/DrillBy/HierarchicalDrillByModal';
 import { useDatasetDrillInfo } from 'src/hooks/apiResources/datasets';
 import { ResourceStatus } from 'src/hooks/apiResources/apiResources';
 import { useDrillDetailMenuItems } from '../useDrillDetailMenuItems';
@@ -60,6 +61,7 @@ export enum ContextMenuItem {
   CrossFilter,
   DrillToDetail,
   DrillBy,
+  HierarchicalDrillBy,
   All,
 }
 export interface ChartContextMenuProps {
@@ -71,6 +73,7 @@ export interface ChartContextMenuProps {
     crossFilter?: Record<string, any>;
     drillToDetail?: Record<string, any>;
     drillBy?: Record<string, any>;
+    hierarchicalDrillBy?: Record<string, any>;
   };
   displayedItems?: ContextMenuItem[] | ContextMenuItem;
 }
@@ -156,6 +159,10 @@ const ChartContextMenu = (
   const [drillModalIsOpen, setDrillModalIsOpen] = useState(false);
   const [drillByColumn, setDrillByColumn] = useState<Column>();
   const [showDrillByModal, setShowDrillByModal] = useState(false);
+  const [showHierarchicalDrillByModal, setShowHierarchicalDrillByModal] =
+    useState(false);
+  const [hierarchicalDrillByColumn, setHierarchicalDrillByColumn] =
+    useState<Column>();
 
   const closeContextMenu = useCallback(() => {
     setVisible(false);
@@ -175,6 +182,15 @@ const ChartContextMenu = (
     setShowDrillByModal(false);
   }, []);
 
+  const handleHierarchicalDrillBy = useCallback((column: Column) => {
+    setHierarchicalDrillByColumn(column);
+    setShowHierarchicalDrillByModal(true);
+  }, []);
+
+  const handleCloseHierarchicalDrillByModal = useCallback(() => {
+    setShowHierarchicalDrillByModal(false);
+  }, []);
+
   const menuItems: MenuItem[] = [];
 
   const showDrillToDetail =
@@ -190,6 +206,17 @@ const ChartContextMenu = (
       formData.matrixify_enable_vertical_layout === true ||
       formData.matrixify_enable_horizontal_layout === true
     ); // Disable drill by when matrixify is enabled
+
+  // Hierarchical Drill By: only for ECharts Timeseries charts
+  const showHierarchicalDrillBy =
+    isFeatureEnabled(FeatureFlag.DrillBy) &&
+    canDrillBy &&
+    isDisplayed(ContextMenuItem.HierarchicalDrillBy) &&
+    String(formData.viz_type ?? '').startsWith('echarts_timeseries') &&
+    !(
+      formData.matrixify_enable_vertical_layout === true ||
+      formData.matrixify_enable_horizontal_layout === true
+    );
 
   const datasetResource = useDatasetDrillInfo(
     formData.datasource,
@@ -208,7 +235,7 @@ const ChartContextMenu = (
     }
 
     // No need to filter the dataset if Drill By is not allowed
-    if (!showDrillBy) {
+    if (!showDrillBy && !showHierarchicalDrillBy) {
       return datasetResource.result;
     }
 
@@ -235,6 +262,7 @@ const ChartContextMenu = (
     datasetResource.status,
     datasetResource.result,
     showDrillBy,
+    showHierarchicalDrillBy,
     enhancedFilters?.drillBy?.groupbyFieldName,
     formData.x_axis,
     formData[enhancedFilters?.drillBy?.groupbyFieldName ?? ''],
@@ -256,6 +284,9 @@ const ChartContextMenu = (
     itemsCount += 2; // Drill to detail always has 2 top-level menu items
   }
   if (showDrillBy) {
+    itemsCount += 1;
+  }
+  if (showHierarchicalDrillBy) {
     itemsCount += 1;
   }
   if (itemsCount === 0) {
@@ -378,6 +409,41 @@ const ChartContextMenu = (
     });
   }
 
+  if (showHierarchicalDrillBy) {
+    if (menuItems.length > 0) {
+      menuItems.push({
+        key: 'divider-hierarchical-drill-by',
+        type: 'divider' as const,
+      });
+    }
+
+    const hasHierarchicalDrillBy =
+      enhancedFilters?.hierarchicalDrillBy?.groupbyFieldName;
+    const handlesDimensionContextMenu = getChartMetadataRegistry()
+      .get(formData.viz_type)
+      ?.behaviors.find(behavior => behavior === Behavior.DrillBy);
+    const isHierarchicalDrillByDisabled =
+      !handlesDimensionContextMenu || !hasHierarchicalDrillBy;
+
+    menuItems.push({
+      key: 'hierarchical-drill-by-submenu',
+      disabled: isHierarchicalDrillByDisabled,
+      label: (
+        <DrillBySubmenu
+          drillByConfig={enhancedFilters?.hierarchicalDrillBy}
+          onSelection={onSelection}
+          onCloseMenu={closeContextMenu}
+          formData={formData}
+          onDrillBy={handleHierarchicalDrillBy}
+          dataset={filteredDataset}
+          isLoadingDataset={isLoadingDataset}
+          menuTitle={t('Drill by (hierarchical)')}
+          {...(additionalConfig?.hierarchicalDrillBy || {})}
+        />
+      ),
+    });
+  }
+
   const open = useCallback(
     (clientX: number, clientY: number, filters?: ContextMenuFilters) => {
       const adjustedY = getMenuAdjustedY(clientY, itemsCount);
@@ -462,6 +528,19 @@ const ChartContextMenu = (
             drillByConfig={enhancedFilters?.drillBy}
             formData={formData}
             onHideModal={handleCloseDrillByModal}
+            dataset={filteredDataset}
+            canDownload={canDownload}
+          />
+        )}
+      {showHierarchicalDrillByModal &&
+        hierarchicalDrillByColumn &&
+        filteredDataset &&
+        enhancedFilters?.hierarchicalDrillBy && (
+          <HierarchicalDrillByModal
+            column={hierarchicalDrillByColumn}
+            drillByConfig={enhancedFilters?.hierarchicalDrillBy}
+            formData={formData}
+            onHideModal={handleCloseHierarchicalDrillByModal}
             dataset={filteredDataset}
             canDownload={canDownload}
           />

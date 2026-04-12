@@ -46,6 +46,11 @@ export interface ContextMenuFilters {
     groupbyFieldName: string;
     adhocFilterFieldName?: string;
   };
+  hierarchicalDrillBy?: {
+    filters: BinaryQueryObjectFilterClause[];
+    groupbyFieldName: string;
+    adhocFilterFieldName?: string;
+  };
 }
 
 export enum AppSection {

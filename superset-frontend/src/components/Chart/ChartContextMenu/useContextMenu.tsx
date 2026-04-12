@@ -32,6 +32,7 @@ export const useContextMenu = (
     crossFilter?: Record<string, any>;
     drillToDetail?: Record<string, any>;
     drillBy?: Record<string, any>;
+    hierarchicalDrillBy?: Record<string, any>;
   },
 ) => {
   const contextMenuRef = useRef<ChartContextMenuRef>(null);
