@@ -45,6 +45,7 @@ export enum FeatureFlag {
   EmbeddableCharts = 'EMBEDDABLE_CHARTS',
   EmbeddedSuperset = 'EMBEDDED_SUPERSET',
   EnableAdvancedDataTypes = 'ENABLE_ADVANCED_DATA_TYPES',
+  EnableEtlJobs = 'ENABLE_ETL_JOBS',
   EnableExtensions = 'ENABLE_EXTENSIONS',
   EnableViewers = 'ENABLE_VIEWERS',
   /** @deprecated */

@@ -733,6 +733,10 @@ DEFAULT_FEATURE_FLAGS: dict[str, bool] = {
     # @lifecycle: testing
     # @docs: https://superset.apache.org/docs/configuration/alerts-reports
     "ALERT_REPORTS": False,
+    # Enables the ETL Jobs addon (addons/etl/).
+    # Requires the ETL tables to be migrated and Celery Beat configured.
+    # @lifecycle: development
+    "ENABLE_ETL_JOBS": False,
     # Enables Slack V2 integration for Alerts and Reports.
     # Defaults to True; the legacy Slack v1 path is deprecated and will be removed
     # in the next major release. Operators must grant the Slack bot both the
@@ -1634,6 +1638,10 @@ class CeleryConfig:  # pylint: disable=too-few-public-methods
         "superset.tasks.thumbnails",
         "superset.tasks.cache",
         "superset.tasks.slack",
+        # ETL addon tasks — imported unconditionally so that Celery workers
+        # register the task names even when the feature flag is disabled.
+        # The tasks themselves check ENABLE_ETL_JOBS before doing any work.
+        "addons.etl.tasks.scheduler",
     )
     result_backend = "db+sqlite:///celery_results.sqlite"
     worker_prefetch_multiplier = 1
@@ -1652,6 +1660,17 @@ class CeleryConfig:  # pylint: disable=too-few-public-methods
         "reports.prune_log": {
             "task": "reports.prune_log",
             "schedule": crontab(minute=0, hour=0),
+        },
+        # ETL addon scheduler — checks every minute for jobs due to run.
+        # Has no effect unless ENABLE_ETL_JOBS feature flag is True.
+        "etl.scheduler": {
+            "task": "etl.scheduler",
+            "schedule": crontab(minute="*", hour="*"),
+        },
+        # ETL addon log pruner — runs daily at 01:00 UTC.
+        "etl.prune_log": {
+            "task": "etl.prune_log",
+            "schedule": crontab(minute=0, hour=1),
         },
         # Uncomment to enable pruning of the query table
         # "prune_query": {
@@ -2325,6 +2344,20 @@ ALERT_REPORTS_WEBHOOK_HTTPS_ONLY = True
 # Mattermost/Rocket.Chat, an automation server, etc.). Leave False (the default)
 # in any internet-facing deployment.
 ALERT_REPORTS_WEBHOOK_ALLOW_INTERNAL_HOSTS: bool = False
+
+# ---------------------------------------------------------------------------
+# ETL Addon configuration  (requires ENABLE_ETL_JOBS feature flag)
+# ---------------------------------------------------------------------------
+# Allowed URL schemes for ETL source URLs (SSRF protection).
+ETL_ALLOWED_URL_SCHEMES: list[str] = ["http", "https", "smb"]
+# When True, ETL workers are permitted to fetch from private/internal IP
+# addresses via HTTP/HTTPS.  Leave False for production.
+ETL_ALLOW_INTERNAL_URLS: bool = False
+# SMB shares are typically on internal networks; internal hosts are allowed
+# by default.  Set to False to enforce the same network isolation as HTTP.
+ETL_SMB_ALLOW_INTERNAL_HOSTS: bool = True
+# HTTP request timeout (seconds) when downloading ETL source files.
+ETL_REQUEST_TIMEOUT_SECONDS: int = 60
 
 # When True, Impala's cancel_query HTTP call is permitted to target hosts in
 # private/internal IP ranges (RFC-1918, loopback, link-local). Intended for

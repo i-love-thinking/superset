@@ -182,6 +182,11 @@ const FileHandler = lazy(
   () => import(/* webpackChunkName: "FileHandler" */ 'src/pages/FileHandler'),
 );
 
+const EtlJobList = lazy(
+  () =>
+    import(/* webpackChunkName: "EtlJobList" */ 'src/pages/EtlJobList'),
+);
+
 const RedirectWarning = lazy(
   () =>
     import(
@@ -239,6 +244,10 @@ export const routes: Routes = [
   { path: RoutePaths.ACTION_LOG, Component: ActionLogList },
   { path: RoutePaths.REGISTRATIONS, Component: UserRegistrations },
 ];
+
+if (isFeatureEnabled(FeatureFlag.EnableEtlJobs)) {
+  routes.push({ path: RoutePaths.ETL_JOBS, Component: EtlJobList });
+}
 
 if (isFeatureEnabled(FeatureFlag.TaggingSystem)) {
   routes.push({ path: RoutePaths.ALL_ENTITIES, Component: AllEntities });

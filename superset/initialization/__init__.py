@@ -302,6 +302,20 @@ class SupersetAppInitializer:  # pylint: disable=too-many-public-methods
 
             appbuilder.add_api(TaskRestApi)
 
+        if feature_flag_manager.is_feature_enabled("ENABLE_ETL_JOBS"):
+            from addons.etl.api import EtlJobRestApi
+            from addons.etl.models import EtlJob, EtlJobLog, EtlJobSource  # noqa: F401 – register models
+
+            appbuilder.add_api(EtlJobRestApi)
+            appbuilder.add_link(
+                "ETL Jobs",
+                label=_("ETL Jobs"),
+                href=f"{current_app.config.get('APPLICATION_ROOT', '').rstrip('/')}/etl/list/",
+                icon="fa-refresh",
+                category="Data",
+                category_label=_("Data"),
+            )
+
         #
         # Setup regular views
         #
